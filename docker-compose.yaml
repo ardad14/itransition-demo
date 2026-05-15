@@ -1,0 +1,71 @@
+services:
+  demo-php:
+    build:
+      context: ./docker/php
+      dockerfile: Dockerfile
+    container_name: demo-php
+    environment:
+      PHP_IDE_CONFIG: "serverName=demo"
+      XDEBUG_SESSION: docker-server
+    volumes:
+      - ./:/var/www:rw
+      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    depends_on:
+      - demo-mysql
+    networks:
+      - demo-network
+
+  demo-nginx:
+    image: nginx:alpine
+    container_name: demo-nginx
+    restart: always
+    tty: true
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./:/var/www
+      - ./docker/nginx/conf.d/:/etc/nginx/conf.d/
+      - ./docker/nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - demo-php
+    networks:
+      - demo-network
+
+  demo-mysql:
+    image: mysql:8.4
+    container_name: demo-mysql
+    restart: unless-stopped
+
+    ports:
+      - "3307:3306"
+
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: demo
+      MYSQL_USER: demo
+      MYSQL_PASSWORD: demo
+
+    volumes:
+      - demo-storage:/var/lib/mysql
+
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-proot" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - demo-network
+
+volumes:
+  demo-storage:
+    name: demo-storage
+    driver: local
+
+networks:
+  demo-network:
+    driver: bridge
